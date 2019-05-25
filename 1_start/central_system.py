@@ -1,34 +1,73 @@
 import asyncio
+import logging
 import websockets
 
-from ocpp import call_result
-from ocpp.ocpp_16_enums import Action, RegistrationStatus
-from ocpp.ocpp_16_cs import on, after
+from ocpp.routing import on
+from ocpp.v16 import call_result, ChargePoint as cp
+from ocpp.v16.enums import Action, RegistrationStatus
 
-from demo.duct_tape import ServerWebSocket as WebSocket
-from demo.duct_tape import ChargePoint as cp
+logging.basicConfig(level=logging.INFO)
 
 
 class ChargePoint(cp):
-
     @on(Action.BootNotification)
     def on_boot_notification(self, charge_point_model, charge_point_vendor, **kwargs):
         """ Route BootNotification calls. """
         return call_result.BootNotificationPayload(
             current_time="",
             interval=30,
-            status=RegistrationStatus.Accepted
+            status=RegistrationStatus.accepted
         )
 
 
 async def on_connect(websocket, path):
     """ Create ChargePoint and start processing requests. """
-    cp = ChargePoint(websocket)
+    cp = ChargePoint(path, websocket)
 
     await cp.start()
 
 
-asyncio.get_event_loop().run_until_complete(
-    websockets.serve(on_connect, '0.0.0.0', 9000,
-        subprotocols=['ocpp1.6', 'dcms'], create_protocol=WebSocket))
-asyncio.get_event_loop().run_forever()
+import asyncio
+import websockets
+from datetime import datetime
+
+from ocpp.routing import on
+from ocpp.v16 import ChargePoint as cp
+from ocpp.v16.enums import Action, RegistrationStatus
+from ocpp.v16 import call_result
+
+
+class ChargePoint(cp):
+    @on(Action.BootNotification)
+    def on_boot_notitication(self, charge_point_vendor, charge_point_model, **kwargs):
+        return call_result.BootNotificationPayload(
+      current_time=datetime.utcnow().isoformat(),
+      interval=10,
+      status=RegistrationStatus.accepted
+  )
+
+
+async def on_connect(websocket, path):
+    """ For every new charge point that connects, create a ChargePoint instance
+    and start listening for messages.
+
+    """
+    charge_point_id = path.strip('/')
+    cp = ChargePoint(charge_point_id, websocket)
+
+    await cp.start()
+
+
+async def main():
+    server = await websockets.serve(
+        on_connect,
+        '0.0.0.0',
+        9000,
+        subprotocols=['ocpp1.6']
+    )
+
+    await server.wait_closed()
+
+
+if __name__ == '__main__':
+    asyncio.run(main())
