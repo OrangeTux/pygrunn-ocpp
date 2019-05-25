@@ -1,14 +1,12 @@
 import asyncio
+import logging
 import websockets
-from structlog import get_logger
 
-from ocpp import call
-from ocpp.ocpp_16_enums import Action, RegistrationStatus
+from ocpp.v16 import call, ChargePoint as cp
+from ocpp.v16.enums import Action, RegistrationStatus
 
-from demo.duct_tape import ClientWebSocket as WebSocket
-from demo.duct_tape import ChargePoint as cp
-
-log = get_logger()
+logging.basicConfig(level=logging.INFO)
+log = logging.getLogger()
 
 
 class ChargePoint(cp):
@@ -20,18 +18,20 @@ class ChargePoint(cp):
         )
 
         response = await self.call(payload)
-        if response.status == RegistrationStatus.Accepted:
+        if response.status == RegistrationStatus.accepted:
             log.info('Charge Point accepted!')
 
 
 async def main():
-    async with websockets.connect("ws://localhost:9000/PyGrunn-CP", create_protocol=WebSocket,
-        compression=None,
-        subprotocols=['ocpp1.6']) as ws:
-        cp = ChargePoint(ws)
+    async with websockets.connect(
+        'ws://localhost:9000/CP_1',
+         subprotocols=['ocpp1.6']
+    ) as ws:
 
-        await asyncio.gather(cp.boot_notification(), cp.start())
+        cp = ChargePoint('CP_1', ws)
+
+        await asyncio.gather(cp.start(), cp.boot_notification())
 
 
-asyncio.run(main())
-
+if __name__ == '__main__':
+    asyncio.run(main())
