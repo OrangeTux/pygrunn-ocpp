@@ -11,6 +11,7 @@ log = logging.getLogger()
 
 class ChargePoint(cp):
     async def boot_notification(self):
+        """ Send BootNotification to Central System and process response. """
         payload = call.BootNotificationPayload(
             charge_point_vendor="Alfen BV",
             charge_point_model="ICU Eve Mini",
